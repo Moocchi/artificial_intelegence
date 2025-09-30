@@ -36,6 +36,9 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   video_player: ^2.6.1
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.0
+  geolocator: ^12.0.0
 
 dev_dependencies:
   flutter_test:
@@ -55,6 +58,12 @@ flutter:
   assets:
     - assets/pictures/
     - assets/videos/gusakira.mp4
+    - assets/pictures/bima.jpg
+    - assets/pictures/blek.jpg
+    - assets/pictures/dika.jpg
+    - assets/pictures/moocchi.jpg
+    - assets/pictures/sodonk.jpg
+    - assets/pictures/belle.gif
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

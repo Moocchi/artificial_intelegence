@@ -37,6 +37,7 @@ class CustomBottomNavBar extends StatelessWidget {
     }
 
     return BottomAppBar(
+      color: const Color(0xFFFFFFFF),
       shape: const CircularNotchedRectangle(),
       notchMargin: 15.0,
       clipBehavior: Clip.antiAlias,
@@ -49,7 +50,7 @@ class CustomBottomNavBar extends StatelessWidget {
             navItem(icon: Icons.info_outline, label: "About Us", index: 1),
             const SizedBox(width: 40), // space for the notch/FAB
             navItem(icon: Icons.map, label: "Maps", index: 2),
-            navItem(icon: Icons.person, label: "Profile", index: 3),
+            navItem(icon: Icons.list_alt, label: "Logs", index: 3),
           ],
         ),
       ),
