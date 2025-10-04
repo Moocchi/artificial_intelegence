@@ -50,7 +50,7 @@ class CustomBottomNavBar extends StatelessWidget {
             navItem(icon: Icons.info_outline, label: "About Us", index: 1),
             const SizedBox(width: 40), // space for the notch/FAB
             navItem(icon: Icons.map, label: "Maps", index: 2),
-            navItem(icon: Icons.list_alt, label: "Logs", index: 3),
+            navItem(icon: Icons.group, label: "Group", index: 3),
           ],
         ),
       ),

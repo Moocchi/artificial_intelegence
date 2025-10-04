@@ -1,8 +1,11 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'pages/maps_page.dart';
 import 'pages/home_page.dart';
 import 'pages/about_page.dart';
-import 'pages/logs_page.dart';
+import 'pages/group_page.dart';
+import 'pages/consul_page.dart'; // ✅ pastikan import AddPage
+
 import 'widgets/custom_bottom_nav.dart';
 
 void main() {
@@ -77,7 +80,7 @@ class MainPageState extends State<MainPage> with TickerProviderStateMixin {
     HomePage(),
     AboutPage(),
     MapsPage(),
-    LogsPage(),
+    GroupPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -113,8 +116,13 @@ class MainPageState extends State<MainPage> with TickerProviderStateMixin {
           position: _offsetAnimation,
           child: FloatingActionButton(
             backgroundColor: Colors.blue,
+            heroTag: 'main-fab', // <-- unique heroTag
             onPressed: () {
-              debugPrint("Add button pressed");
+              // ✅ Arahkan ke AddPage
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddPage()),
+              );
             },
             shape: const CircleBorder(),
             child: const Icon(Icons.add, color: Colors.white, size: 32),

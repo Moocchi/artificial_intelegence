@@ -62,6 +62,7 @@ class _MapsPageState extends State<MapsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF0F0F0),
       body: _currentPosition == null
           ? const Center(child: CircularProgressIndicator())
           : Stack(
