@@ -4,8 +4,7 @@ import 'pages/maps_page.dart';
 import 'pages/home_page.dart';
 import 'pages/about_page.dart';
 import 'pages/group_page.dart';
-import 'pages/consul_page.dart'; // ✅ pastikan import AddPage
-
+import 'pages/consul_page.dart'; 
 import 'widgets/custom_bottom_nav.dart';
 
 void main() {

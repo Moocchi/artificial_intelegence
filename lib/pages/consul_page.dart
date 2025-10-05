@@ -1,5 +1,8 @@
 // ignore: file_names
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'maps_page.dart';
 
 class AddPage extends StatefulWidget {
   const AddPage({super.key});
@@ -12,6 +15,9 @@ class _AddPageState extends State<AddPage> {
   List<String> selectedSymptoms = [];
   String? predictedDisease;
   double? confidence;
+  // keep a single search controller for the symptoms picker to avoid
+  // disposing it while the modal still has active widgets listening to it
+  final TextEditingController _searchController = TextEditingController();
 
   final symptoms = [
   'Abdominal Pain',
@@ -146,14 +152,65 @@ class _AddPageState extends State<AddPage> {
   'Yellow Urine',
   'Yellowing Of Eyes',
   'Yellowish Skin',
-];
+  ];
 
-  void predictDisease() {
-    setState(() {
-      predictedDisease = 'GERD';
-      confidence = 13.0;
-    });
+  void predictDisease() async {
+    if (selectedSymptoms.isEmpty) return;
+
+    if (selectedSymptoms.length == symptoms.length) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          contentPadding: const EdgeInsets.all(8),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/pictures/yang-benar.gif',
+                width: 260,
+                height: 260,
+                fit: BoxFit.contain,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Tutup')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final url = Uri.parse("http://127.0.0.1:5000/predict");
+    final headers = {"Content-Type": "application/json"};
+    final body = jsonEncode({"symptoms": selectedSymptoms});
+
+    try {
+      final response = await http.post(url, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (!mounted) return;
+        setState(() {
+          predictedDisease = data["predicted_disease"];
+          confidence = data["confidence"];
+        });
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal prediksi: ${response.statusCode}")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Tidak bisa terhubung ke server: $e")),
+      );
+    }
   }
+
+
 
   void resetAll() {
     setState(() {
@@ -322,6 +379,45 @@ class _AddPageState extends State<AddPage> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                            child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              foregroundColor: Colors.white,
+                              side: BorderSide.none,
+                              shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Konfirmasi'),
+                                  content: const Text('Anda yakin ingin menambahkan semua gejala?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Batal')),
+                                    TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Ya')),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                setState(() {
+                                  selectedSymptoms = List.from(symptoms);
+                                });
+                              }
+                            },
+                            child: const Text(
+                              'Tambah semua gejala',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -377,6 +473,51 @@ class _AddPageState extends State<AddPage> {
                     style: const TextStyle(color: Colors.black87),
                   ),
                 ),
+                const SizedBox(height: 12),
+
+                const SizedBox(height: 24),
+                const Divider(color: Colors.grey),
+                const SizedBox(height: 16),
+                // Konsultasi warning + button to navigate to MapsPage and find nearest hospital
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Butuh konsultasi?',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Jika gejala Anda dan hasil pemeriksaan menunjukkan kondisi yang serius harap segera konsultasikan dengan dokter dari rumah sakit terdekat.',
+                        style: TextStyle(color: Colors.black87),
+                        textAlign: TextAlign.justify,
+                      ),
+                        const SizedBox(height: 8),
+                      Center(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // Navigate to MapsPage and trigger nearest hospital search
+                            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MapsPage(findNearestOnOpen: true)));
+                          },
+                          icon: const Icon(Icons.local_hospital),
+                          label: const Text('Cari RS Terdekat'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
 
               const SizedBox(height: 24),
@@ -416,140 +557,139 @@ class _AddPageState extends State<AddPage> {
   void _showSymptomsPicker(BuildContext context) {
     // Persist these while the modal is open so filtering doesn't reset on rebuild
     final available = symptoms.where((s) => !selectedSymptoms.contains(s)).toList();
-    final TextEditingController searchController = TextEditingController();
     List<String> filtered = List.from(available);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      enableDrag: false,
       builder: (_) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.4,
-          maxChildSize: 0.95,
-          builder: (context, scrollCtrl) {
-            return StatefulBuilder(builder: (context, setModalState) {
-              void applyFilter(String q) {
-                setModalState(() {
-                  filtered = available.where((s) => s.toLowerCase().contains(q.toLowerCase())).toList();
-                });
-              }
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha((0.08 * 255).toInt()),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: StatefulBuilder(builder: (context, setModalState) {
+            void applyFilter(String q) {
+              setModalState(() {
+                filtered = available.where((s) => s.toLowerCase().contains(q.toLowerCase())).toList();
+              });
+            }
 
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Drag handle and title
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text('Tambah Gejala', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                SizedBox(height: 4),
-                                Text('Pilih satu atau lebih gejala', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.close),
-                          ),
-                        ],
-                      ),
-                    ),
+            final ScrollController listScrollCtrl = ScrollController();
 
-                    // Search field
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: TextField(
-                        controller: searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Cari gejala...',
-                          prefixIcon: const Icon(Icons.search),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
+            return Column(
+              children: [
+                // Drag handle and title
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Tambah Gejala', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            SizedBox(height: 4),
+                            Text('Pilih satu atau lebih gejala', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                          ],
                         ),
-                        onChanged: applyFilter,
                       ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // List
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? const Center(child: Text('Tidak ada gejala sesuai pencarian'))
-                          : ListView.separated(
-                              controller: scrollCtrl,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
-                              itemBuilder: (context, i) {
-                                final s = filtered[i];
-                                return ListTile(
-                                  title: Text(s),
-                                  leading: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
-                                  onTap: () {
-                                    setState(() {
-                                      selectedSymptoms.add(s);
-                                    });
-                                    // remove from modal list
-                                    setModalState(() {
-                                      filtered.removeAt(i);
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Selesai'),
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ),
-                        ],
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            });
-          },
+
+                // Search field
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Cari gejala...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: applyFilter,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // List
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text('Tidak ada gejala sesuai pencarian'))
+                      : ListView.separated(
+                          controller: listScrollCtrl,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, i) {
+                            final s = filtered[i];
+                            return ListTile(
+                              title: Text(s),
+                              leading: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
+                              onTap: () {
+                                setState(() {
+                                  selectedSymptoms.add(s);
+                                });
+                                // remove from modal list
+                                setModalState(() {
+                                  filtered.removeAt(i);
+                                });
+                              },
+                            );
+                          },
+                        ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Selesai'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }),
         );
       },
-    ).whenComplete(() {
-      // dispose controller when sheet closes
-      searchController.dispose();
-    });
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }

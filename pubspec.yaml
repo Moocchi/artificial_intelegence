@@ -66,6 +66,7 @@ flutter:
     - assets/pictures/moocchi.jpg
     - assets/pictures/sodonk.jpg
     - assets/pictures/belle.gif
+    - assets/pictures/yang-benar.gif
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
